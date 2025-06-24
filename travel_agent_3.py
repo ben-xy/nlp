@@ -11,12 +11,13 @@ from langchain_openai import ChatOpenAI
 from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
 from langgraph.graph import StateGraph, START, END
 from langgraph.checkpoint.memory import MemorySaver
+
 from langgraph.prebuilt import ToolNode
 from langchain_core.tools import tool
 from langgraph.types import Send
 from dotenv import load_dotenv
 
-# ==================== Configuration ====================
+# ==================== API Keys and Configuration ====================
 NOMINATIM_API_URL = "https://nominatim.openstreetmap.org/search" # Nominatim API endpoint
 OPENWEATHER_API_URL = "https://api.openweathermap.org/data/2.5/forecast" # OpenWeather API endpoint
 TAVILY_API_URL = "https://api.tavily.com/search" # Tavily API endpoint
@@ -647,7 +648,7 @@ builder.add_conditional_edges(
 # Connect plan processing back to feedback loop
 builder.add_edge("process_plan_feedback", "human_feedback_plan")
 
-# Compile graph with checkpointer and interruptions
+# Compile graph with checkpointing and interruptions
 memory = MemorySaver()
 graph = builder.compile(
     checkpointer=memory,
@@ -703,7 +704,7 @@ if __name__ == "__main__":
     )
     
     # Run the graph
-    for event in graph.stream(initial_state, stream_mode="values"):
+    for event in graph.stream(initial_state, stream_mode="values", config={"configurable": {"thread_id": thread["configurable"]["thread_id"]}}):
         print(f"Node: {list(event.keys())[0]}")
         if "detected_locations" in event:
             print(f"Locations: {event['detected_locations']}")

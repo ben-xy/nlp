@@ -11,10 +11,16 @@ from langchain_openai import ChatOpenAI
 from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
 from langgraph.graph import StateGraph, START, END
 from langgraph.checkpoint.memory import MemorySaver
+
 from langgraph.prebuilt import ToolNode
 from langchain_core.tools import tool
 from langgraph.types import Send
 from dotenv import load_dotenv
+
+# ==================== API Keys and Configuration ====================
+NOMINATIM_API_URL = "https://nominatim.openstreetmap.org/search" # Nominatim API endpoint
+OPENWEATHER_API_URL = "https://api.openweathermap.org/data/2.5/forecast" # OpenWeather API endpoint
+TAVILY_API_URL = "https://api.tavily.com/search" # Tavily API endpoint
 
 # Environment variable setup
 def _set_env(var: str):
@@ -72,7 +78,7 @@ class BestSubtopicState(TypedDict):
 def get_latlon(destination: str) -> str:
     """Get latitude and longitude for a destination"""
     resp = requests.get(
-        "https://nominatim.openstreetmap.org/search",
+        NOMINATIM_API_URL,
         params={"q": destination, "format": "json", "limit": 1},
         headers={"User-Agent": "Travel-Agent"},
         timeout=10,
@@ -91,7 +97,7 @@ def get_weather(city: str, days: int = 5) -> List[Dict]:
     try:
         lat, lon = map(float, get_latlon(city).split(","))
         resp = requests.get(
-            "https://api.openweathermap.org/data/2.5/forecast",
+            OPENWEATHER_API_URL,
             params={
                 "lat": lat,
                 "lon": lon,
@@ -133,7 +139,7 @@ def search_web(query: str) -> str:
     
     try:
         resp = requests.get(
-            "https://api.tavily.com/search",
+            TAVILY_API_URL,
             params={
                 "api_key": TAVILY_API_KEY,
                 "query": query,
@@ -309,8 +315,6 @@ def generate_locations_and_subtopics(state: TravelState) -> TravelState:
                 content = content[7:-3]
             elif content.startswith("```"):
                 content = content[3:-3]
-            
-            
             
             subtopics = json.loads(content)
             if not isinstance(subtopics, list):
@@ -644,7 +648,7 @@ builder.add_conditional_edges(
 # Connect plan processing back to feedback loop
 builder.add_edge("process_plan_feedback", "human_feedback_plan")
 
-# Compile graph with checkpointer and interruptions
+# Compile graph with checkpointing and interruptions
 memory = MemorySaver()
 graph = builder.compile(
     checkpointer=memory,
@@ -700,7 +704,7 @@ if __name__ == "__main__":
     )
     
     # Run the graph
-    for event in graph.stream(initial_state, stream_mode="values"):
+    for event in graph.stream(initial_state, stream_mode="values", config={"configurable": {"thread_id": thread["configurable"]["thread_id"]}}):
         print(f"Node: {list(event.keys())[0]}")
         if "detected_locations" in event:
             print(f"Locations: {event['detected_locations']}")

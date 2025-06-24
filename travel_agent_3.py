@@ -16,6 +16,11 @@ from langchain_core.tools import tool
 from langgraph.types import Send
 from dotenv import load_dotenv
 
+# ==================== Configuration ====================
+NOMINATIM_API_URL = "https://nominatim.openstreetmap.org/search" # Nominatim API endpoint
+OPENWEATHER_API_URL = "https://api.openweathermap.org/data/2.5/forecast" # OpenWeather API endpoint
+TAVILY_API_URL = "https://api.tavily.com/search" # Tavily API endpoint
+
 # Environment variable setup
 def _set_env(var: str):
     if not os.environ.get(var):
@@ -72,7 +77,7 @@ class BestSubtopicState(TypedDict):
 def get_latlon(destination: str) -> str:
     """Get latitude and longitude for a destination"""
     resp = requests.get(
-        "https://nominatim.openstreetmap.org/search",
+        NOMINATIM_API_URL,
         params={"q": destination, "format": "json", "limit": 1},
         headers={"User-Agent": "Travel-Agent"},
         timeout=10,
@@ -91,7 +96,7 @@ def get_weather(city: str, days: int = 5) -> List[Dict]:
     try:
         lat, lon = map(float, get_latlon(city).split(","))
         resp = requests.get(
-            "https://api.openweathermap.org/data/2.5/forecast",
+            OPENWEATHER_API_URL,
             params={
                 "lat": lat,
                 "lon": lon,
@@ -133,7 +138,7 @@ def search_web(query: str) -> str:
     
     try:
         resp = requests.get(
-            "https://api.tavily.com/search",
+            TAVILY_API_URL,
             params={
                 "api_key": TAVILY_API_KEY,
                 "query": query,
@@ -309,8 +314,6 @@ def generate_locations_and_subtopics(state: TravelState) -> TravelState:
                 content = content[7:-3]
             elif content.startswith("```"):
                 content = content[3:-3]
-            
-            
             
             subtopics = json.loads(content)
             if not isinstance(subtopics, list):

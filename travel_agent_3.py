@@ -238,6 +238,7 @@ def process_video_file(video_file_path: str) -> str:
 # ==================== Main Graph Nodes ====================
 
 def process_input(state: TravelState) -> TravelState:
+    print(f"Processing user input: {state.get('user_query', '')}")
     """Process user input (text or video)"""
     user_query = state.get("user_query", "")
     video_file_path = state.get("video_file_path")
@@ -259,8 +260,9 @@ def process_input(state: TravelState) -> TravelState:
 
 def generate_locations_and_subtopics(state: TravelState) -> TravelState:
     """Extract locations and generate subtopics from input text"""
-    full_text = state.get("full_text", "")
+    print(f"Generating locations and subtopics from text: {state.get('full_text', '')}")
     
+    full_text = state.get("full_text", "")
     # Enhanced prompt for better location detection
     location_prompt = f"""
     You are a travel assistant. Extract destination locations from the following text.
@@ -285,15 +287,11 @@ def generate_locations_and_subtopics(state: TravelState) -> TravelState:
             elif content.startswith("```"):
                 content = content[3:-3]
             
-            
-            
             locations = json.loads(content)
             if not isinstance(locations, list):
                 locations = [locations]
         else:
             locations = []
-        
-        
         
         # Generate subtopics based on locations
         subtopics_prompt = f"""
@@ -322,8 +320,6 @@ def generate_locations_and_subtopics(state: TravelState) -> TravelState:
         else:
             subtopics = []
         
-
-        
         return {
             **state,
             "detected_locations": locations,
@@ -343,17 +339,16 @@ def generate_locations_and_subtopics(state: TravelState) -> TravelState:
 
 def get_weather_info(state: TravelState) -> TravelState:
     """Get weather information for detected locations"""
+    print(f"Getting weather information for locations: {state.get('detected_locations', [])}")
+
     locations = state.get("detected_locations", [])
     weather_info = {}
-    
     for location in locations:
         try:
             weather_data = get_weather(location)
             weather_info[location] = weather_data
-            
         except Exception as e:
             weather_info[location] = [{"error": f"Failed to get weather: {str(e)}"}]
-    
     return {
         **state,
         "weather_info": weather_info
@@ -526,13 +521,9 @@ def run_subtopics_reduce(state: TravelState) -> TravelState:
 
 def generate_final_plan(state: TravelState) -> TravelState:
     """Generate final travel plan with all information"""
-    
-    
     locations = state.get("detected_locations", [])
     weather_info = state.get("weather_info", {})
     subtopic_results = state.get("subtopic_results", {})
-    
-
     
     # Format weather information
     weather_summary = ""
@@ -543,8 +534,6 @@ def generate_final_plan(state: TravelState) -> TravelState:
                 if "error" not in day:
                     weather_summary += f"  {day['date']}: {day['summary']}, {day['temp_min']}°C - {day['temp_max']}°C, Rain: {day['pop_max']*100:.0f}%\n"
     
-
-    
     # Format subtopic results
     subtopics_summary = ""
     for key, summary in subtopic_results.items():
@@ -554,8 +543,6 @@ def generate_final_plan(state: TravelState) -> TravelState:
     # If no subtopic results, create a basic plan
     if not subtopics_summary:
         subtopics_summary = f"\nBasic information for {', '.join(locations)}:\nBased on general travel knowledge and weather conditions."
-    
-   
     
     prompt = f"""
     You are a professional travel planner. Create a comprehensive travel plan for: {', '.join(locations)}
@@ -582,22 +569,16 @@ def generate_final_plan(state: TravelState) -> TravelState:
     
     Format should be clear and easy to read. For each day in the itinerary, start with the weather information and explain why specific activities were chosen based on the weather conditions.
     """
-    
-    
     response = llm.invoke([HumanMessage(content=prompt)])
     content = response.content
     travel_plan = content if isinstance(content, str) else ""
     
-
-    
     return {
         **state,
         "travel_plan": travel_plan,
-        
     }
 
 # ==================== Graph Construction ====================
-
 # Build main graph
 builder = StateGraph(TravelState)
 
@@ -656,7 +637,6 @@ graph = builder.compile(
 )
 
 # ==================== Usage Functions ====================
-
 def create_travel_agent():
     """Create travel agent instance"""
     return graph
@@ -679,10 +659,7 @@ def run_travel_agent(user_query: str = "", audio_file_path: Optional[str] = None
         "plan_feedback": None,
         "messages": []
     }
-    
     thread = {"configurable": {"thread_id": thread_id}}
-    
-    
     
     return graph, initial_state, thread
 
@@ -695,20 +672,110 @@ def continue_with_feedback(graph, thread, feedback_type: str, feedback_content: 
     
     return graph.stream(None, config={"configurable": {"thread_id": thread["configurable"]["thread_id"]}}, stream_mode="updates")
 
-# Example usage
-if __name__ == "__main__":
-    # Example: Text input
+# ==================== Console Interaction ====================
+def print_weather_info(weather_info: Dict[str, Any]) -> None:
+    """Print weather information in a readable format"""
+    for loc, weather_list in weather_info.items():
+        print(f"  {loc}:")
+        for day in weather_list:
+            if "error" in day:
+                print(f"    Error: {day['error']}")
+            else:
+                date = day.get('date', 'N/A')
+                summary = day.get('summary', 'N/A')
+                temp_min = day.get('temp_min', 'N/A')
+                temp_max = day.get('temp_max', 'N/A')
+                pop_max = day.get('pop_max', 0)
+                print(f"    {date}: {summary}, {temp_min}°C - {temp_max}°C, Rain: {round(pop_max * 100)}%")
+
+DEFAULT_QUERY = "I want to visit Seoul and Tokyo for 5 days)"
+def generate_plan():
+    # Prompt the user to enter their travel requirements
+    user_query = input(f"Please enter your travel needs (e.g., {DEFAULT_QUERY}):\n> ").strip()
+    if not user_query:
+        user_query = DEFAULT_QUERY
+        print(f"No input provided. Using default: {DEFAULT_QUERY}")
+
+    # Create and run the travel agent
     graph, initial_state, thread = run_travel_agent(
-        user_query="I want to visit Seoul and Tokyo for 5 days",
-        thread_id="example_1"
+        user_query=user_query,
+        thread_id="console_session"
     )
-    
-    # Run the graph
-    for event in graph.stream(initial_state, stream_mode="values", config={"configurable": {"thread_id": thread["configurable"]["thread_id"]}}):
-        print(f"Node: {list(event.keys())[0]}")
-        if "detected_locations" in event:
-            print(f"Locations: {event['detected_locations']}")
-        if "subtopics" in event:
-            print(f"Subtopics: {event['subtopics']}")
-        if "travel_plan" in event:
-            print(f"Travel plan generated!")
+    # Run the main process until user feedback is required
+    for event in graph.stream(initial_state, stream_mode="values", 
+    config={"configurable": {"thread_id": thread['configurable']['thread_id']}}):
+        node = list(event.keys())[0]
+        print(f"\n[Node]: {node}")
+        if "detected_locations" in event and event["detected_locations"]:
+            print(f"[Detected destinations]: {event['detected_locations']}")
+        if "subtopics" in event and event["subtopics"]:
+            print(f"[Recommended subtopics]: {event['subtopics']}")
+        if "weather_info" in event and event["weather_info"]:
+            print("[Weather forecast]:")
+            weather_info = event["weather_info"]
+            print_weather_info(weather_info)
+        if "travel_plan" in event and event["travel_plan"]:
+            print(f"[Travel plan generated!]")
+            print(event["travel_plan"])
+        # Check if user feedback is needed
+        if node in ("human_feedback_subtopics", "human_feedback_plan"):
+            return graph, thread, node
+    return graph, thread, None
+
+def main_console_loop():
+    """
+    Runs the main console loop for the travel planning application.
+
+    This function repeatedly prompts the user to input travel-related prompts, processes them using `method_A`, 
+    and enters a feedback loop where the user can provide suggestions or modifications for recommended subtopics 
+    or the generated travel plan. The loop continues until the user indicates satisfaction or chooses to end the session.
+
+    Workflow:
+    1. Prompts the user for input and calls `generate_plan` to generate initial results.
+    2. If feedback is required, enters a loop to collect user feedback on subtopics or the travel plan.
+    3. Processes feedback using `continue_with_feedback` and updates the session accordingly.
+    4. After each session, asks the user if they want to start a new travel planning session.
+    5. Exits when the user chooses not to continue.
+
+    Note:
+    - User interactions are handled via the console.
+    - The function assumes the existence of `generate_plan` and `continue_with_feedback`.
+    """
+    while True:
+        graph, thread, feedback_node = generate_plan()
+        if not feedback_node:
+            print("No feedback node returned. Return to Menu.")
+            continue
+        # Enter feedback loop
+        while feedback_node:
+            if feedback_node == "human_feedback_subtopics":
+                feedback = input("\nPlease provide suggestions for the recommended subtopics, or enter 'satisfied' to continue:\n> ").strip()
+                feedback_type = "subtopics"
+            elif feedback_node == "human_feedback_plan":
+                feedback = input("\nPlease provide suggestions for the travel plan, or enter 'satisfied' to finish:\n> ").strip()
+                feedback_type = "plan"
+            else:
+                break
+            # Continue the workflow
+            for event in continue_with_feedback(graph, thread, feedback_type, feedback):
+                node = list(event.keys())[0]
+                print(f"\n[Node]: {node}")
+                if "subtopics" in event:
+                    print(f"[Recommended subtopics]: {event['subtopics']}")
+                if "travel_plan" in event:
+                    print(f"[Travel plan generated!]")
+                    print(event["travel_plan"])
+                if node in ("human_feedback_subtopics", "human_feedback_plan"):
+                    feedback_node = node
+                    break
+                else:
+                    feedback_node = None
+
+        # Ask if the user wants to start a new session
+        again = input("\nDo you want to start a new travel planning session? (y/n): ").strip().lower()
+        if again != "y":
+            print("Thank you for using the travel planner!")
+            break
+
+if __name__ == "__main__":
+    main_console_loop()

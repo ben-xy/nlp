@@ -688,10 +688,13 @@ def print_weather_info(weather_info: Dict[str, Any]) -> None:
                 pop_max = day.get('pop_max', 0)
                 print(f"    {date}: {summary}, {temp_min}°C - {temp_max}°C, Rain: {round(pop_max * 100)}%")
 
-DEFAULT_QUERY = "I want to visit Seoul and Tokyo for 5 days)"
+DEFAULT_QUERY = "I want to visit Seoul and Tokyo for 5 days"
 def generate_plan():
     # Prompt the user to enter their travel requirements
-    user_query = input(f"Please enter your travel needs (e.g., {DEFAULT_QUERY}):\n> ").strip()
+    user_query = input(f"Please enter your travel needs. Type q/Q to quit. (e.g., {DEFAULT_QUERY}):\n> ").strip()
+    if user_query.lower() == "q":
+        print("User typed q/Q.")
+        return None, None, None
     if not user_query:
         user_query = DEFAULT_QUERY
         print(f"No input provided. Using default: {DEFAULT_QUERY}")
@@ -743,6 +746,9 @@ def main_console_loop():
     """
     while True:
         graph, thread, feedback_node = generate_plan()
+        if graph is None and thread is None and feedback_node is None:
+            print("Manually Exiting...")
+            break
         if not feedback_node:
             print("No feedback node returned. Return to Menu.")
             continue

@@ -1,4 +1,4 @@
-[English Version](README.md) | [中文版](README_CN.md)
+[English](README.md) | [中文版](README_CN.md)
 
 # Travel Assistant
 

@@ -672,6 +672,8 @@ def continue_with_feedback(graph, thread, feedback_type: str, feedback_content: 
     
     return graph.stream(None, config={"configurable": {"thread_id": thread["configurable"]["thread_id"]}}, stream_mode="updates")
 
+
+
 # ==================== Console Interaction ====================
 def print_weather_info(weather_info: Dict[str, Any]) -> None:
     """Print weather information in a readable format"""

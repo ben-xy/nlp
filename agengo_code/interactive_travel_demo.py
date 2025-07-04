@@ -1,16 +1,15 @@
 #!/usr/bin/env python3
 
-
 import sys
 import os
 from typing import Callable, Any
 from langchain_core.runnables import RunnableConfig
 
-# Add current directory to Python path
+# Add current directory to Python path for local imports
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 def show_weather(weather_data):
-    """Display weather information"""
+    """Display weather information in a formatted way."""
     print("\n🌤️  Weather Information:")
     print("=" * 40)
     if isinstance(weather_data, list) and weather_data:
@@ -27,7 +26,7 @@ def show_weather(weather_data):
     print()
 
 def show_travelers(travelers_data):
-    """Display traveler information"""
+    """Display generated traveler information."""
     print("\n👥 Generated Travelers:")
     print("=" * 40)
     if isinstance(travelers_data, list) and travelers_data:
@@ -40,19 +39,21 @@ def show_travelers(travelers_data):
         print("No traveler information available")
     print()
 
-
-
-
-
 def get_user_feedback(prompt: str) -> str:
-    """Get user feedback"""
+    """Prompt user for feedback and return the input."""
     print(f"\n💬 {prompt}")
-    
     feedback = input("> ")
     return feedback
 
-def get_user_input_with_default(prompt: str, default: Any, cast_func: Callable[[str], Any] = str) -> Any:
-    """Get user input with default value support"""
+def get_user_input_with_default(
+    prompt: str, 
+    default: Any, 
+    cast_func: Callable[[str], Any] = str
+) -> Any:
+    """
+    Prompt user for input with a default value.
+    If input is empty or invalid, return the default.
+    """
     val = input(f"{prompt} (default: {default}): ").strip()
     if not val:
         return default
@@ -63,14 +64,22 @@ def get_user_input_with_default(prompt: str, default: Any, cast_func: Callable[[
         return default
 
 def run_interactive_demo():
-    """Run interactive demo"""
+    """Main function to run the interactive travel assistant demo."""
     try:
-        from travel_assistant import graph
-        
-        city = get_user_input_with_default("📍📍📍Please enter the destination city", "tokyo", str)
-        days = get_user_input_with_default("📍📍📍Please enter the number of travel days", 3, int)
-        max_travelers = get_user_input_with_default("📍📍📍Please enter the number of agent travelers generated", 1, int)
-        
+        from travel_assistant import graph  # Import the travel assistant graph
+
+        # Get user input for city, days, and number of travelers
+        city = get_user_input_with_default(
+            "📍📍📍Please enter the destination city", "tokyo", str
+        )
+        days = get_user_input_with_default(
+            "📍📍📍Please enter the number of travel days", 3, int
+        )
+        max_travelers = get_user_input_with_default(
+            "📍📍📍Please enter the number of agent travelers generated", 1, int
+        )
+
+        # Initialize the state dictionary for the assistant
         initial_state = {
             "city": city,
             "days": days,
@@ -83,15 +92,17 @@ def run_interactive_demo():
             "content": "",
             "final_plan": ""
         }
-        
+
+        # Display initial user selections
         print(f"📍 Destination: {city}")
         print(f"📅 Days: {days}")
         print(f"👤 Max Travelers: {max_travelers}")
         print("=" * 50)
-        
+
         current_state = initial_state.copy()
-        thread = {"configurable": {"thread_id": "1"}}
-        
+        thread = {"configurable": {"thread_id": "1"}}  # Thread context for the assistant
+
+        # Stream traveler generation events and display them
         for event in graph.stream(current_state, thread, stream_mode="values"):
             travelers = event.get('travelers', '')
             if travelers:
@@ -99,10 +110,15 @@ def run_interactive_demo():
                     print("👤" * 50)
                     print(f"Name: {traveler.name}")
                     print(f"Description: {traveler.description}")
-                     
-        
-        feedback_t = get_user_feedback("Please review the generated travelers above and provide feedback to regenerate:")
-        graph.update_state(thread, {"human_feedback_traveler": feedback_t}, as_node="human_feedback_traveler_node")
+
+        # Get user feedback for travelers and update the state
+        feedback_t = get_user_feedback(
+            "Please review the generated travelers above and provide feedback to regenerate:"
+        )
+        graph.update_state(
+            thread, {"human_feedback_traveler": feedback_t}, as_node="human_feedback_traveler_node"
+        )
+        # Stream updated travelers after feedback
         for event in graph.stream(None, thread, stream_mode="values"):
             travelers = event.get('travelers', '')
             if travelers:
@@ -110,20 +126,24 @@ def run_interactive_demo():
                     print("👤" * 50)
                     print(f"Name: {traveler.name}")
                     print(f"Description: {traveler.description}")
-                    
-        graph.update_state(thread, {"human_feedback_traveler": None}, as_node="human_feedback_traveler_node") 
+
+        # Reset feedback and stream the final plan
+        graph.update_state(
+            thread, {"human_feedback_traveler": None}, as_node="human_feedback_traveler_node"
+        )
         for event in graph.stream(None, thread, stream_mode="values"):
             final_plan = event.get('final_plan', '')
             if final_plan:
-                print("final_plan" )
+                print("final_plan")
                 print("📅" * 50)
                 print(final_plan)
                 print("📅" * 50)
         print("✅ Demo complete!")
         print("=" * 50)
     except Exception as e:
+        # Catch and display any errors during execution
         print(f"❌ Execution error: {e}")
 
-# Check main entry
+# Entry point for the script
 if __name__ == "__main__":
-    run_interactive_demo() 
+    run_interactive_demo()
